@@ -177,7 +177,11 @@ typedef struct CB_GUILib
 typedef void (*PVRTransferEpgEntry)(void *userData, const PVR_HANDLE handle, const EPG_TAG *epgentry);
 typedef void (*PVRTransferChannelEntry)(void *userData, const PVR_HANDLE handle, const PVR_CHANNEL *chan);
 typedef void (*PVRTransferTimerEntry)(void *userData, const PVR_HANDLE handle, const PVR_TIMER *timer);
+typedef void (*PVRAddLocalTimerEntry)(void *addonData, const PVR_TIMER *timer);
+typedef void (*PVRDeleteLocalTimerEntry)(void *addonData, int iClientIndex);
 typedef void (*PVRTransferRecordingEntry)(void *userData, const PVR_HANDLE handle, const PVR_RECORDING *recording);
+typedef void (*PVRAddLocalRecordingEntry)(void *addonData, const PVR_RECORDING *recording);
+typedef void (*PVRDeleteLocalRecordingEntry)(void *addonData, const char *strRecordingId);
 typedef void (*PVRAddMenuHook)(void *addonData, PVR_MENUHOOK *hook);
 typedef void (*PVRRecording)(void *addonData, const char *Name, const char *FileName, bool On);
 typedef void (*PVRTriggerChannelUpdate)(void *addonData);
@@ -196,7 +200,11 @@ typedef struct CB_PVRLib
   PVRTransferEpgEntry           TransferEpgEntry;
   PVRTransferChannelEntry       TransferChannelEntry;
   PVRTransferTimerEntry         TransferTimerEntry;
+  PVRAddLocalTimerEntry         AddLocalTimerEntry;
+  PVRDeleteLocalTimerEntry      DeleteLocalTimerEntry;
   PVRTransferRecordingEntry     TransferRecordingEntry;
+  PVRAddLocalRecordingEntry     AddLocalRecordingEntry;
+  PVRDeleteLocalRecordingEntry  DeleteLocalRecordingEntry;
   PVRAddMenuHook                AddMenuHook;
   PVRRecording                  Recording;
   PVRTriggerChannelUpdate       TriggerChannelUpdate;

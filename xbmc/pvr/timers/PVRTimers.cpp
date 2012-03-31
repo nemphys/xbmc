@@ -548,6 +548,73 @@ bool CPVRTimers::AddTimer(CPVRTimerInfoTag &item)
   return item.AddToClient();
 }
 
+bool CPVRTimers::AddLocalTimer(CPVRTimerInfoTag &timer)
+{
+  bool bChanged(false);
+  bool bAdded(false);
+  CStdString timerNotification;
+
+  CSingleLock lock(m_critSection);
+
+  CPVRTimerInfoTag *existingTimer = (CPVRTimerInfoTag *) GetByClient(timer.m_iClientId, timer.m_iClientIndex);
+  if (existingTimer)
+  {
+    /* if it's present, update the current tag */
+    bool bStateChanged(existingTimer->m_state != timer.m_state);
+    if (existingTimer->UpdateEntry(timer))
+    {
+      bChanged = true;
+      if (bStateChanged && g_PVRManager.IsStarted())
+        existingTimer->GetNotificationText(timerNotification);
+      CLog::Log(LOGDEBUG,"PVRTimers - %s - updated timer %d on client %d",
+          __FUNCTION__, timer.m_iClientIndex, timer.m_iClientId);
+    }
+  }
+  else
+  {
+    /* new timer */
+    CPVRTimerInfoTag *newTimer = new CPVRTimerInfoTag;
+    newTimer->UpdateEntry(timer);
+    vector<CPVRTimerInfoTag *>* addEntry = NULL;
+    map<CDateTime, vector<CPVRTimerInfoTag *>* >::iterator itr = m_tags.find(newTimer->StartAsUTC());
+    if (itr == m_tags.end())
+    {
+      addEntry = new vector<CPVRTimerInfoTag *>;
+      m_tags.insert(make_pair(newTimer->StartAsUTC(), addEntry));
+    }
+    else
+      addEntry = itr->second;
+
+    addEntry->push_back(newTimer);
+    bChanged = true;
+    bAdded = true;
+
+    if (g_PVRManager.IsStarted())
+      newTimer->GetNotificationText(timerNotification);
+
+    CLog::Log(LOGDEBUG,"PVRTimers - %s - added timer %d on client %d",
+        __FUNCTION__, timer.m_iClientIndex, timer.m_iClientId);
+  }
+
+  if (bChanged)
+  {
+    SetChanged();
+    lock.Leave();
+
+    NotifyObservers(bAdded ? "timers-reset" : "timers", false);
+
+    if (g_guiSettings.GetBool("pvrrecord.timernotifications"))
+    {
+      /* queue notifications */
+      CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info,
+          g_localizeStrings.Get(19166),
+          timerNotification);
+    }
+  }
+
+  return bChanged;
+}
+
 bool CPVRTimers::DeleteTimer(const CFileItem &item, bool bForce /* = false */)
 {
   /* Check if a CPVRTimerInfoTag is inside file item */
@@ -567,6 +634,56 @@ bool CPVRTimers::DeleteTimer(const CFileItem &item, bool bForce /* = false */)
 bool CPVRTimers::DeleteTimer(CPVRTimerInfoTag &item, bool bForce /* = false */)
 {
   return item.DeleteFromClient(bForce);
+}
+
+bool CPVRTimers::DeleteLocalTimer(int iClientId, int iClientIndex)
+{
+  bool bReturn(false);
+  CStdString timerNotification;
+
+  CSingleLock lock(m_critSection);
+
+  for (map<CDateTime, vector<CPVRTimerInfoTag *>* >::iterator it = m_tags.begin(); it != m_tags.end(); it++)
+  {
+    vector<CPVRTimerInfoTag*> *entry = it->second;
+    for (unsigned int iTimerPtr = 0; iTimerPtr < entry->size(); iTimerPtr++)
+    {
+      CPVRTimerInfoTag *existingTimer = entry->at(iTimerPtr);
+      if (existingTimer->m_iClientId == iClientId && existingTimer->m_iClientIndex == iClientIndex)
+      {
+        /* we found the timer to be deleted */
+        CLog::Log(LOGDEBUG,"PVRTimers - %s - deleting timer %d (client %d)",
+          __FUNCTION__, existingTimer->m_iClientIndex, existingTimer->m_iClientId);
+        if (g_PVRManager.IsStarted())
+        {
+          CStdString strMessage;
+          strMessage.Format("%s: '%s'", (existingTimer->EndAsUTC() <= CDateTime::GetCurrentDateTime().GetAsUTCDateTime()) ? g_localizeStrings.Get(19227) : g_localizeStrings.Get(19228), existingTimer->m_strTitle.c_str());
+          timerNotification = strMessage;
+        }
+        delete entry->at(iTimerPtr);
+        entry->erase(entry->begin() + iTimerPtr);
+        if (entry->size() == 0)
+          m_tags.erase(it++);
+        bReturn = true;
+       }
+    }
+  }
+
+  if (bReturn)
+  {
+    SetChanged();
+    lock.Leave();
+
+    NotifyObservers("timers-reset", false);
+    if (g_guiSettings.GetBool("pvrrecord.timernotifications"))
+    {
+      /* queue notifications */
+      CGUIDialogKaiToast::QueueNotification(CGUIDialogKaiToast::Info,
+          g_localizeStrings.Get(19166),
+          timerNotification);
+    }
+  }
+  return bReturn;
 }
 
 bool CPVRTimers::RenameTimer(CFileItem &item, const CStdString &strNewName)

@@ -317,6 +317,54 @@ unsigned int CHTSPData::GetNumRecordings()
   return recordings.size();
 }
 
+PVR_RECORDING CHTSPData::PrepareXBMCRecording(SRecording recording)
+{
+  CStdString strStreamURL = "http://";
+  CStdString strRecordingId;
+  std::string strChannelName = "";
+
+  /* lock */
+  {
+    CLockObject lock(m_mutex);
+    SChannels::const_iterator itr = m_channels.find(recording.channel);
+    if (itr != m_channels.end())
+      strChannelName = itr->second.name.c_str();
+
+    if (g_strUsername != "")
+    {
+      strStreamURL += g_strUsername;
+      if (g_strPassword != "")
+      {
+        strStreamURL += ":";
+        strStreamURL += g_strPassword;
+      }
+      strStreamURL += "@";
+    }
+    strStreamURL.Format("%s%s:%i/dvrfile/%i", strStreamURL.c_str(), g_strHostname.c_str(), g_iPortHTTP, recording.id);
+  }
+
+  strRecordingId.Format("%i", recording.id);
+
+  PVR_RECORDING tag;
+  memset(&tag, 0, sizeof(PVR_RECORDING));
+
+  tag.strRecordingId = strRecordingId.c_str();
+  tag.strTitle       = recording.title.c_str();
+  tag.strStreamURL   = strStreamURL.c_str();
+  tag.strDirectory   = "/";
+  tag.strPlotOutline = "";
+  tag.strPlot        = recording.description.c_str();
+  tag.strChannelName = strChannelName.c_str();
+  tag.recordingTime  = recording.start;
+  tag.iDuration      = recording.stop - recording.start;
+  tag.iPriority      = 0;
+  tag.iLifetime      = 0;
+  tag.iGenreType     = 0;
+  tag.iGenreSubType  = 0;
+
+  return tag;
+}
+
 PVR_ERROR CHTSPData::GetRecordings(PVR_HANDLE handle)
 {
   SRecordings recordings = GetDVREntries(true, false);
@@ -324,50 +372,7 @@ PVR_ERROR CHTSPData::GetRecordings(PVR_HANDLE handle)
   for(SRecordings::const_iterator it = recordings.begin(); it != recordings.end(); ++it)
   {
     SRecording recording = it->second;
-
-    CStdString strStreamURL = "http://";
-    CStdString strRecordingId;
-    std::string strChannelName = "";
-
-    /* lock */
-    {
-      CLockObject lock(m_mutex);
-      SChannels::const_iterator itr = m_channels.find(recording.channel);
-      if (itr != m_channels.end())
-        strChannelName = itr->second.name.c_str();
-
-      if (g_strUsername != "")
-      {
-        strStreamURL += g_strUsername;
-        if (g_strPassword != "")
-        {
-          strStreamURL += ":";
-          strStreamURL += g_strPassword;
-        }
-        strStreamURL += "@";
-      }
-      strStreamURL.Format("%s%s:%i/dvrfile/%i", strStreamURL.c_str(), g_strHostname.c_str(), g_iPortHTTP, recording.id);
-    }
-
-    strRecordingId.Format("%i", recording.id);
-
-    PVR_RECORDING tag;
-    memset(&tag, 0, sizeof(PVR_RECORDING));
-
-    tag.strRecordingId = strRecordingId.c_str();
-    tag.strTitle       = recording.title.c_str();
-    tag.strStreamURL   = strStreamURL.c_str();
-    tag.strDirectory   = "/";
-    tag.strPlotOutline = "";
-    tag.strPlot        = recording.description.c_str();
-    tag.strChannelName = strChannelName.c_str();
-    tag.recordingTime  = recording.start;
-    tag.iDuration      = recording.stop - recording.start;
-    tag.iPriority      = 0;
-    tag.iLifetime      = 0;
-    tag.iGenreType     = 0;
-    tag.iGenreSubType  = 0;
-
+    PVR_RECORDING tag(PrepareXBMCRecording(recording));
     PVR->TransferRecordingEntry(handle, &tag);
   }
 
@@ -461,6 +466,33 @@ PVR_ERROR CHTSPData::GetChannelGroupMembers(PVR_HANDLE handle, const PVR_CHANNEL
   return PVR_ERROR_NO_ERROR;
 }
 
+PVR_TIMER CHTSPData::PrepareXBMCTimer(SRecording timer)
+{
+  PVR_TIMER tag;
+  memset(&tag, 0, sizeof(PVR_TIMER));
+
+  tag.iClientIndex      = timer.id;
+  tag.iClientChannelUid = timer.channel;
+  tag.startTime         = timer.start;
+  tag.endTime           = timer.stop;
+  tag.strTitle          = timer.title.c_str();
+  tag.strDirectory      = "/";   // unused
+  tag.strSummary        = timer.description.c_str();
+  tag.state             = (PVR_TIMER_STATE) timer.state;
+  tag.iPriority         = 0;     // unused
+  tag.iLifetime         = 0;     // unused
+  tag.bIsRepeating      = false; // unused
+  tag.firstDay          = 0;     // unused
+  tag.iWeekdays         = 0;     // unused
+  tag.iEpgUid           = 0;     // unused
+  tag.iMarginStart      = 0;     // unused
+  tag.iMarginEnd        = 0;     // unused
+  tag.iGenreType        = 0;     // unused
+  tag.iGenreSubType     = 0;     // unused
+
+  return tag;
+}
+
 PVR_ERROR CHTSPData::GetTimers(PVR_HANDLE handle)
 {
   SRecordings recordings = GetDVREntries(false, true);
@@ -468,29 +500,7 @@ PVR_ERROR CHTSPData::GetTimers(PVR_HANDLE handle)
   for(SRecordings::const_iterator it = recordings.begin(); it != recordings.end(); ++it)
   {
     SRecording recording = it->second;
-
-    PVR_TIMER tag;
-    memset(&tag, 0, sizeof(PVR_TIMER));
-
-    tag.iClientIndex      = recording.id;
-    tag.iClientChannelUid = recording.channel;
-    tag.startTime         = recording.start;
-    tag.endTime           = recording.stop;
-    tag.strTitle          = recording.title.c_str();
-    tag.strDirectory      = "/";   // unused
-    tag.strSummary        = recording.description.c_str();
-    tag.state             = (PVR_TIMER_STATE) recording.state;
-    tag.iPriority         = 0;     // unused
-    tag.iLifetime         = 0;     // unused
-    tag.bIsRepeating      = false; // unused
-    tag.firstDay          = 0;     // unused
-    tag.iWeekdays         = 0;     // unused
-    tag.iEpgUid           = 0;     // unused
-    tag.iMarginStart      = 0;     // unused
-    tag.iMarginEnd        = 0;     // unused
-    tag.iGenreType        = 0;     // unused
-    tag.iGenreSubType     = 0;     // unused
-
+    PVR_TIMER tag(PrepareXBMCTimer(recording));
     PVR->TransferTimerEntry(handle, &tag);
   }
 
@@ -640,6 +650,10 @@ PVR_ERROR CHTSPData::RenameRecording(const PVR_RECORDING &recording, const char 
   {
     XBMC->Log(LOG_DEBUG, "%s - Failed to parse param", __FUNCTION__);
     return PVR_ERROR_SERVER_ERROR;
+  }
+  else
+  {
+
   }
 
   return success > 0 ? PVR_ERROR_NO_ERROR : PVR_ERROR_NOT_SAVED;
@@ -931,10 +945,23 @@ void CHTSPData::ParseDVREntryDelete(htsmsg_t* msg)
 
   XBMC->Log(LOG_DEBUG, "%s - Recording %i was deleted", __FUNCTION__, id);
 
+  SRecording recording;
+  recording = m_recordings[id];
+
   m_recordings.erase(id);
 
-  PVR->TriggerTimerUpdate();
-  PVR->TriggerRecordingUpdate();
+  if (recording.state == ST_SCHEDULED ||
+      recording.state == ST_RECORDING)
+    PVR->DeleteLocalTimerEntry(id);
+
+  if(recording.state == ST_RECORDING ||
+     recording.state == ST_COMPLETED ||
+     recording.state == ST_INVALID)
+  {
+    CStdString strRecordingId;
+    strRecordingId.Format("%i", recording.id);
+    PVR->DeleteLocalRecordingEntry(strRecordingId);
+  }
 }
 
 void CHTSPData::ParseDVREntryUpdate(htsmsg_t* msg)
@@ -992,10 +1019,19 @@ void CHTSPData::ParseDVREntryUpdate(htsmsg_t* msg)
 
   m_recordings[recording.id] = recording;
 
-  PVR->TriggerTimerUpdate();
+  if (recording.state == ST_SCHEDULED || recording.state == ST_RECORDING)
+  {
+    PVR_TIMER tag(PrepareXBMCTimer(recording));
+    PVR->AddLocalTimerEntry(&tag);
+  }
+  else
+    PVR->DeleteLocalTimerEntry(recording.id);
 
   if (recording.state == ST_RECORDING)
-   PVR->TriggerRecordingUpdate();
+  {
+    PVR_RECORDING rec(PrepareXBMCRecording(recording));
+    PVR->AddLocalRecordingEntry(&rec);
+  }
 }
 
 bool CHTSPData::ParseEvent(htsmsg_t* msg, uint32_t id, SEvent &event)

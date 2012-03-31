@@ -242,7 +242,17 @@ bool CPVRRecordings::RenameRecording(CFileItem &item, CStdString &strNewName)
   }
 
   CPVRRecording* tag = item.GetPVRRecordingInfoTag();
-  return tag->Rename(strNewName);
+  bReturn = tag->Rename(strNewName);
+  if (bReturn)
+  {
+    CSingleLock lock(m_critSection);
+    SetChanged();
+    lock.Leave();
+
+    NotifyObservers("recordings-reset");
+  }
+
+  return bReturn;
 }
 
 bool CPVRRecordings::GetDirectory(const CStdString& strPath, CFileItemList &items)
@@ -328,4 +338,40 @@ void CPVRRecordings::UpdateEntry(const CPVRRecording &tag)
     newTag->Update(tag);
     push_back(newTag);
   }
+}
+
+void CPVRRecordings::AddLocalRecording(const CPVRRecording &recording)
+{
+  CLog::Log(LOGDEBUG, "CPVRRecordings - %s - Adding/Updating local recording %s", __FUNCTION__, recording.m_strRecordingId.c_str());
+  UpdateEntry(recording);
+
+  CSingleLock lock(m_critSection);
+  SetChanged();
+  lock.Leave();
+
+  NotifyObservers("recordings-reset");
+}
+
+bool CPVRRecordings::DeleteLocalRecording(int iClientId, const CStdString &strRecordingId)
+{
+  bool bReturn(false);
+  CSingleLock lock(m_critSection);
+  CLog::Log(LOGDEBUG, "CPVRRecordings - %s - Deleting local recording %s", __FUNCTION__, strRecordingId.c_str());
+  for (unsigned int iRecordingPtr = 0; iRecordingPtr < size(); iRecordingPtr++)
+  {
+    CPVRRecording *currentTag = at(iRecordingPtr);
+    if (currentTag->m_iClientId == iClientId &&
+        currentTag->m_strRecordingId.Equals(strRecordingId))
+    {
+      delete at(iRecordingPtr);
+      erase(begin() + iRecordingPtr);
+      bReturn = true;
+      SetChanged();
+      lock.Leave();
+      NotifyObservers("recordings-reset");
+      break;
+    }
+  }
+
+  return bReturn;
 }

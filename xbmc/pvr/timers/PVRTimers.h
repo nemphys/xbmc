@@ -175,6 +175,21 @@ namespace PVR
      */
     static bool UpdateTimer(CPVRTimerInfoTag &item);
 
+    /**
+     * @brief Insert or Update a local timer.
+     * @param timer The timer to insert or update.
+     * @return True if it was either insert or updated, false if not.
+     */
+    bool AddLocalTimer(CPVRTimerInfoTag &timer);
+
+    /**
+     * @brief Delete a local timer.
+     * @param iClientId The ID of the pvr client
+     * @param iClientIndex The index of the timer on the client.
+     * @return True if it was deleted successfully, false if not.
+     */
+    bool DeleteLocalTimer(int iClientId, int iClientIndex);
+
     bool IsRecording(void);
     bool UpdateEntries(CPVRTimers *timers);
     CPVRTimerInfoTag *GetByClient(int iClientId, int iClientTimerId);

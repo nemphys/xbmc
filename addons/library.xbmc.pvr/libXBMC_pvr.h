@@ -90,9 +90,25 @@ public:
       dlsym(m_libXBMC_pvr, "PVR_transfer_timer_entry");
     if (TransferTimerEntry == NULL)     { fprintf(stderr, "Unable to assign function %s\n", dlerror()); return false; }
 
+    AddLocalTimerEntry      = (void (*)(const PVR_TIMER *timer))
+      dlsym(m_libXBMC_pvr, "PVR_add_local_timer_entry");
+    if (AddLocalTimerEntry == NULL)     { fprintf(stderr, "Unable to assign function %s\n", dlerror()); return false; }
+
+    DeleteLocalTimerEntry      = (void (*)(int iClientIndex))
+      dlsym(m_libXBMC_pvr, "PVR_delete_local_timer_entry");
+    if (DeleteLocalTimerEntry == NULL)     { fprintf(stderr, "Unable to assign function %s\n", dlerror()); return false; }
+
     TransferRecordingEntry  = (void (*)(const PVR_HANDLE handle, const PVR_RECORDING *recording))
       dlsym(m_libXBMC_pvr, "PVR_transfer_recording_entry");
     if (TransferRecordingEntry == NULL) { fprintf(stderr, "Unable to assign function %s\n", dlerror()); return false; }
+
+    AddLocalRecordingEntry      = (void (*)(const PVR_RECORDING *recording))
+      dlsym(m_libXBMC_pvr, "PVR_add_local_recording_entry");
+    if (AddLocalRecordingEntry == NULL)     { fprintf(stderr, "Unable to assign function %s\n", dlerror()); return false; }
+
+    DeleteLocalRecordingEntry      = (void (*)(const char *strRecordingId))
+      dlsym(m_libXBMC_pvr, "PVR_delete_local_recording_entry");
+    if (DeleteLocalRecordingEntry == NULL)     { fprintf(stderr, "Unable to assign function %s\n", dlerror()); return false; }
 
     AddMenuHook             = (void (*)(PVR_MENUHOOK *hook))
       dlsym(m_libXBMC_pvr, "PVR_add_menu_hook");
@@ -142,7 +158,11 @@ public:
   void (*TransferEpgEntry)(const PVR_HANDLE handle, const EPG_TAG *epgentry);
   void (*TransferChannelEntry)(const PVR_HANDLE handle, const PVR_CHANNEL *chan);
   void (*TransferTimerEntry)(const PVR_HANDLE handle, const PVR_TIMER *timer);
+  void (*AddLocalTimerEntry)(const PVR_TIMER *timer);
+  void (*DeleteLocalTimerEntry)(int iClientIndex);
   void (*TransferRecordingEntry)(const PVR_HANDLE handle, const PVR_RECORDING *recording);
+  void (*AddLocalRecordingEntry)(const PVR_RECORDING *recording);
+  void (*DeleteLocalRecordingEntry)(const char *strRecordingId);
   void (*AddMenuHook)(PVR_MENUHOOK *hook);
   void (*Recording)(const char *Name, const char *FileName, bool On);
   void (*TriggerTimerUpdate)();

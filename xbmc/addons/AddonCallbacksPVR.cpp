@@ -49,7 +49,11 @@ CAddonCallbacksPVR::CAddonCallbacksPVR(CAddon* addon)
   m_callbacks->TransferEpgEntry           = PVRTransferEpgEntry;
   m_callbacks->TransferChannelEntry       = PVRTransferChannelEntry;
   m_callbacks->TransferTimerEntry         = PVRTransferTimerEntry;
+  m_callbacks->AddLocalTimerEntry         = PVRAddLocalTimerEntry;
+  m_callbacks->DeleteLocalTimerEntry      = PVRDeleteLocalTimerEntry;
   m_callbacks->TransferRecordingEntry     = PVRTransferRecordingEntry;
+  m_callbacks->AddLocalRecordingEntry     = PVRAddLocalRecordingEntry;
+  m_callbacks->DeleteLocalRecordingEntry  = PVRDeleteLocalRecordingEntry;
   m_callbacks->AddMenuHook                = PVRAddMenuHook;
   m_callbacks->Recording                  = PVRRecording;
   m_callbacks->TriggerChannelUpdate       = PVRTriggerChannelUpdate;
@@ -167,6 +171,41 @@ void CAddonCallbacksPVR::PVRTransferRecordingEntry(void *addonData, const PVR_HA
   xbmcRecordings->UpdateFromClient(tag);
 }
 
+void CAddonCallbacksPVR::PVRAddLocalRecordingEntry(void *addonData, const PVR_RECORDING *recording)
+{
+  CAddonCallbacks* addon = (CAddonCallbacks*) addonData;
+  if (addon == NULL || recording == NULL)
+  {
+    CLog::Log(LOGERROR, "CAddonCallbacksPVR - %s - called with a null pointer", __FUNCTION__);
+    return;
+  }
+
+  CAddonCallbacksPVR* addonHelper = addon->GetHelperPVR();
+  CPVRClient* client  = (CPVRClient*) addonHelper->m_addon;
+
+  CPVRRecording rec(*recording, client->GetClientID());
+
+  /* Add/Update this entry in the recordings container */
+  g_PVRRecordings->AddLocalRecording(rec);
+}
+
+void CAddonCallbacksPVR::PVRDeleteLocalRecordingEntry(void *addonData, const char *strRecordingId)
+{
+  CAddonCallbacks* addon = (CAddonCallbacks*) addonData;
+  if (addon == NULL)
+  {
+    CLog::Log(LOGERROR, "CAddonCallbacksPVR - %s - called with a null pointer", __FUNCTION__);
+    return;
+  }
+
+  CAddonCallbacksPVR* addonHelper = addon->GetHelperPVR();
+  CPVRClient* client  = (CPVRClient*) addonHelper->m_addon;
+
+  /* Delete this entry from the recordings container */
+  CStdString RecId(strRecordingId);
+  g_PVRRecordings->DeleteLocalRecording(client->GetClientID(), RecId);
+}
+
 void CAddonCallbacksPVR::PVRTransferTimerEntry(void *addonData, const PVR_HANDLE handle, const PVR_TIMER *timer)
 {
   CAddonCallbacks* addon = (CAddonCallbacks*) addonData;
@@ -191,6 +230,51 @@ void CAddonCallbacksPVR::PVRTransferTimerEntry(void *addonData, const PVR_HANDLE
 
   /* transfer this entry to the timers container */
   xbmcTimers->UpdateFromClient(tag);
+}
+
+void CAddonCallbacksPVR::PVRAddLocalTimerEntry(void *addonData, const PVR_TIMER *timer)
+{
+  CAddonCallbacks* addon = (CAddonCallbacks*) addonData;
+  if (addon == NULL || timer == NULL)
+  {
+    CLog::Log(LOGERROR, "CAddonCallbacksPVR - %s - called with a null pointer", __FUNCTION__);
+    return;
+  }
+
+  if (g_PVRManager.IsStarted())
+  {
+    CAddonCallbacksPVR* addonHelper = addon->GetHelperPVR();
+    CPVRClient* client  = (CPVRClient*) addonHelper->m_addon;
+    CPVRChannel *channel   = (CPVRChannel *) g_PVRChannelGroups->GetByUniqueID(timer->iClientChannelUid, client->GetClientID());
+
+    if (channel == NULL)
+    {
+      CLog::Log(LOGERROR, "CAddonCallbacksPVR - %s - cannot find channel %d on client %d",
+          __FUNCTION__, timer->iClientChannelUid, client->GetClientID());
+      return;
+    }
+
+    CPVRTimerInfoTag tag(*timer, channel, client->GetClientID());
+
+    /* Add/Update this entry in the timers container */
+    g_PVRTimers->AddLocalTimer(tag);
+  }
+}
+
+void CAddonCallbacksPVR::PVRDeleteLocalTimerEntry(void *addonData, int iClientIndex)
+{
+  CAddonCallbacks* addon = (CAddonCallbacks*) addonData;
+  if (addon == NULL)
+  {
+    CLog::Log(LOGERROR, "CAddonCallbacksPVR - %s - called with a null pointer", __FUNCTION__);
+    return;
+  }
+
+  CAddonCallbacksPVR* addonHelper = addon->GetHelperPVR();
+  CPVRClient* client  = (CPVRClient*) addonHelper->m_addon;
+
+  /* Delete this entry from the timers container */
+  g_PVRTimers->DeleteLocalTimer(client->GetClientID(), iClientIndex);
 }
 
 void CAddonCallbacksPVR::PVRAddMenuHook(void *addonData, PVR_MENUHOOK *hook)

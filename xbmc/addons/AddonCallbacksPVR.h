@@ -83,12 +83,40 @@ public:
   static void PVRTransferTimerEntry(void *addonData, const PVR_HANDLE handle, const PVR_TIMER *timer);
 
   /*!
+   * @brief Add or Update a timer entry to XBMC.
+   * @param addonData A pointer to the add-on.
+   * @param timer The entry to add/update.
+   */
+  static void PVRAddLocalTimerEntry(void *addonData, const PVR_TIMER *timer);
+
+  /*!
+   * @brief Delete a timer entry from XBMC.
+   * @param addonData A pointer to the add-on.
+   * @param timer The entry to delete.
+   */
+  static void PVRDeleteLocalTimerEntry(void *addonData, int iClientIndex);
+
+  /*!
    * @brief Transfer a recording entry from the add-on to XBMC.
    * @param addonData A pointer to the add-on.
    * @param handle The handle that initiated this action.
    * @param recording The entry to transfer.
    */
   static void PVRTransferRecordingEntry(void *addonData, const PVR_HANDLE handle, const PVR_RECORDING *recording);
+
+  /*!
+   * @brief Add or Update a recording entry to XBMC.
+   * @param addonData A pointer to the add-on.
+   * @param recording The entry to add/update.
+   */
+  static void PVRAddLocalRecordingEntry(void *addonData, const PVR_RECORDING *recording);
+
+  /*!
+   * @brief Delete a recording entry from XBMC.
+   * @param addonData A pointer to the add-on.
+   * @param recording The entry to delete.
+   */
+  static void PVRDeleteLocalRecordingEntry(void *addonData, const char *strRecordingId);
 
   /*!
    * @brief Add a menu hook to this add-on table.

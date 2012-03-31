@@ -57,6 +57,20 @@ namespace PVR
      */
     void Update(void);
 
+    /**
+     * @brief Insert or Update a local recording.
+     * @param recording The recording to insert or update.
+     */
+    void AddLocalRecording(const CPVRRecording &recording);
+
+    /**
+     * @brief Delete a local recording.
+     * @param iClientId The ID of the pvr client
+     * @param iClientIndex The index of the recording on the client.
+     * @return True if it was deleted successfully, false if not.
+     */
+    bool DeleteLocalRecording(int iClientId, const CStdString &strRecordingId);
+
     int GetNumRecordings();
     int GetRecordings(CFileItemList* results);
     bool DeleteRecording(const CFileItem &item);

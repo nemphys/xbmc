@@ -90,12 +90,44 @@ DLLEXPORT void PVR_transfer_timer_entry(const PVR_HANDLE handle, const PVR_TIMER
   m_cb->TransferTimerEntry(m_Handle->addonData, handle, timer);
 }
 
+DLLEXPORT void PVR_add_local_timer_entry(const PVR_TIMER *timer)
+{
+  if (m_cb == NULL)
+    return;
+
+  m_cb->AddLocalTimerEntry(m_Handle->addonData, timer);
+}
+
+DLLEXPORT void PVR_delete_local_timer_entry(int iClientIndex)
+{
+  if (m_cb == NULL)
+    return;
+
+  m_cb->DeleteLocalTimerEntry(m_Handle->addonData, iClientIndex);
+}
+
 DLLEXPORT void PVR_transfer_recording_entry(const PVR_HANDLE handle, const PVR_RECORDING *recording)
 {
   if (m_cb == NULL)
     return;
 
   m_cb->TransferRecordingEntry(m_Handle->addonData, handle, recording);
+}
+
+DLLEXPORT void PVR_add_local_recording_entry(const PVR_RECORDING *recording)
+{
+  if (m_cb == NULL)
+    return;
+
+  m_cb->AddLocalRecordingEntry(m_Handle->addonData, recording);
+}
+
+DLLEXPORT void PVR_delete_local_recording_entry(const char *strRecordingId)
+{
+  if (m_cb == NULL)
+    return;
+
+  m_cb->DeleteLocalRecordingEntry(m_Handle->addonData, strRecordingId);
 }
 
 DLLEXPORT void PVR_add_menu_hook(PVR_MENUHOOK *hook)
