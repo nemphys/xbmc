@@ -149,7 +149,6 @@ void CEpgContainer::Notify(const Observable &obs, const CStdString& msg)
 
 void CEpgContainer::LoadFromDB(void)
 {
-  bool bLoaded(true);
   unsigned int iCounter(0);
   if (!m_bIgnoreDbForClient && m_database.IsOpen())
   {
@@ -160,11 +159,6 @@ void CEpgContainer::LoadFromDB(void)
 
     for (map<unsigned int, CEpg *>::iterator it = m_epgs.begin(); it != m_epgs.end(); it++)
     {
-      if (InterruptUpdate())
-      {
-        bLoaded = false;
-        break;
-      }
       UpdateProgressDialog(++iCounter, m_epgs.size(), it->second->Name());
       it->second->Load();
     }
@@ -173,7 +167,7 @@ void CEpgContainer::LoadFromDB(void)
   }
 
   CSingleLock lock(m_critSection);
-  m_bLoaded = bLoaded;
+  m_bLoaded = true;
 }
 
 bool CEpgContainer::PersistTables(void)
@@ -204,12 +198,13 @@ void CEpgContainer::Process(void)
   bool bUpdateEpg(true);
   bool bHasPendingUpdates(false);
 
+  CSingleLock lock(m_critSection);
   if (!m_bLoaded)
   {
-    CSingleLock lock(m_critSection);
     LoadFromDB();
     CheckPlayingEvents();
   }
+  lock.Leave();
 
   while (!m_bStop && !g_application.m_bStop)
   {
