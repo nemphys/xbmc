@@ -229,6 +229,12 @@ namespace PVR
     bool IsStarted(void) const;
 
     /*!
+     * @brief Check whether EPG tags for channels have been created.
+     * @return True if EPG tags have been created, false otherwise.
+     */
+    bool EpgsCreated(void) const;
+
+    /*!
      * @brief Reset the playing EPG tag.
      */
     void ResetPlayingTag(void);
@@ -310,6 +316,11 @@ namespace PVR
      * @return The current group or the group containing all channels if it's not set.
      */
     CPVRChannelGroupPtr GetPlayingGroup(bool bRadio = false);
+
+    /*!
+     * @brief Let the background thread create epg tags for all channels.
+     */
+    void TriggerEpgsCreate(void);
 
     /*!
      * @brief Let the background thread update the recordings list.
@@ -467,6 +478,12 @@ namespace PVR
      */
     bool SetWakeupCommand(void);
 
+    /*!
+     * @brief Creat EPG tags for all channels in internal channel groups
+     * @return True if EPG tags where created successfully, false otherwise
+     */
+    bool CreateChannelEpgs(void);
+
   protected:
     /*!
      * @brief PVR update and control thread.
@@ -568,6 +585,7 @@ namespace PVR
     CCriticalSection                m_critSection;                 /*!< critical section for all changes to this class, except for changes to triggers */
     bool                            m_bFirstStart;                 /*!< true when the PVR manager was started first, false otherwise */
     bool                            m_bIsSwitchingChannels;        /*!< true while switching channels */
+    bool                            m_bEpgsCreated;                /*!< true if epg data for channels has been created */
     CGUIDialogProgressBarHandle *   m_progressHandle;              /*!< progress dialog that is displayed while the pvrmanager is loading */
 
     CCriticalSection                m_managerStateMutex;
@@ -575,6 +593,16 @@ namespace PVR
     CStopWatch                     *m_parentalTimer;
     bool                            m_bOpenPVRWindow;
     std::map<std::string, std::string> m_outdatedAddons;
+  };
+
+  class CPVREpgsCreateJob : public CJob
+  {
+  public:
+    CPVREpgsCreateJob(void) {}
+    virtual ~CPVREpgsCreateJob() {}
+    virtual const char *GetType() const { return "pvr-create-epgs"; }
+
+    virtual bool DoWork();
   };
 
   class CPVRRecordingsUpdateJob : public CJob
