@@ -52,6 +52,7 @@ CEpgContainer::CEpgContainer(void) :
   m_iNextEpgId = 0;
   m_bPreventUpdates = false;
   m_updateEvent.Reset();
+  m_bStarted = false;
   m_bLoaded = false;
   m_bHasPendingUpdates = false;
 }
@@ -71,6 +72,12 @@ void CEpgContainer::Unload(void)
 {
   Stop();
   Clear(false);
+}
+
+bool CEpgContainer::IsStarted(void) const
+{
+  CSingleLock lock(m_critSection);
+  return m_bStarted;
 }
 
 unsigned int CEpgContainer::NextEpgId(void)
@@ -99,6 +106,7 @@ void CEpgContainer::Clear(bool bClearDb /* = false */)
     }
     m_epgs.clear();
     m_iNextEpgUpdate  = 0;
+    m_bStarted = false;
     m_bIsInitialising = true;
     m_iNextEpgId = 0;
   }
@@ -124,25 +132,35 @@ void CEpgContainer::Start(void)
 {
   Stop();
 
-  CSingleLock lock(m_critSection);
+  {
+    CSingleLock lock(m_critSection);
 
-  if (!m_database.IsOpen())
-    m_database.Open();
+    if (!m_database.IsOpen())
+      m_database.Open();
 
-  m_bIsInitialising = true;
-  m_bStop = false;
-  g_guiSettings.RegisterObserver(this);
-  LoadSettings();
+    m_bIsInitialising = true;
+    m_bStop = false;
+    g_guiSettings.RegisterObserver(this);
+    LoadSettings();
 
-  m_iNextEpgUpdate  = 0;
-  m_iNextEpgActiveTagCheck = 0;
+    m_iNextEpgUpdate  = 0;
+    m_iNextEpgActiveTagCheck = 0;
+  }
 
   LoadFromDB();
-  CheckPlayingEvents();
 
-  Create();
-  SetPriority(-1);
-  CLog::Log(LOGNOTICE, "%s - EPG thread started", __FUNCTION__);
+  CSingleLock lock(m_critSection);
+  if (!m_bStop)
+  {
+    CheckPlayingEvents();
+
+    Create();
+    SetPriority(-1);
+
+    m_bStarted = true;
+
+    CLog::Log(LOGNOTICE, "%s - EPG thread started", __FUNCTION__);
+  }
 }
 
 bool CEpgContainer::Stop(void)
@@ -151,6 +169,9 @@ bool CEpgContainer::Stop(void)
 
   if (m_database.IsOpen())
     m_database.Close();
+
+  CSingleLock lock(m_critSection);
+  m_bStarted = false;
 
   return true;
 }
@@ -169,6 +190,8 @@ void CEpgContainer::Notify(const Observable &obs, const ObservableMessage msg)
 
 void CEpgContainer::LoadFromDB(void)
 {
+  CSingleLock lock(m_critSection);
+
   if (m_bLoaded || m_bIgnoreDbForClient)
     return;
 
@@ -188,14 +211,17 @@ void CEpgContainer::LoadFromDB(void)
 
     for (map<unsigned int, CEpg *>::iterator it = m_epgs.begin(); it != m_epgs.end(); it++)
     {
+      if (m_bStop)
+        break;
       UpdateProgressDialog(++iCounter, m_epgs.size(), it->second->Name());
+      lock.Leave();
       it->second->Load();
+      lock.Enter();
     }
 
     CloseProgressDialog();
   }
 
-  CSingleLock lock(m_critSection);
   m_bLoaded = bLoaded;
 }
 
@@ -237,7 +263,7 @@ void CEpgContainer::Process(void)
     }
 
     /* update the EPG */
-    if (!InterruptUpdate() && bUpdateEpg && UpdateEPG())
+    if (!InterruptUpdate() && bUpdateEpg && g_PVRManager.EpgsCreated() && UpdateEPG())
       m_bIsInitialising = false;
 
     /* clean up old entries */
@@ -325,7 +351,6 @@ CEpg *CEpgContainer::CreateChannelEpg(CPVRChannelPtr channel)
     return NULL;
 
   WaitForUpdateFinish(true);
-  CSingleLock lock(m_critSection);
   LoadFromDB();
 
   CEpg *epg(NULL);
@@ -336,6 +361,8 @@ CEpg *CEpgContainer::CreateChannelEpg(CPVRChannelPtr channel)
   {
     channel->SetEpgID(NextEpgId());
     epg = new CEpg(channel, false);
+
+    CSingleLock lock(m_critSection);
     m_epgs.insert(make_pair((unsigned int)epg->EpgID(), epg));
     SetChanged();
     epg->RegisterObserver(this);
@@ -343,8 +370,11 @@ CEpg *CEpgContainer::CreateChannelEpg(CPVRChannelPtr channel)
 
   epg->SetChannel(channel);
 
-  m_bPreventUpdates = false;
-  CDateTime::GetCurrentDateTime().GetAsUTCDateTime().GetAsTime(m_iNextEpgUpdate);
+  {
+    CSingleLock lock(m_critSection);
+    m_bPreventUpdates = false;
+    CDateTime::GetCurrentDateTime().GetAsUTCDateTime().GetAsTime(m_iNextEpgUpdate);
+  }
 
   NotifyObservers(ObservableMessageEpgContainer);
 
